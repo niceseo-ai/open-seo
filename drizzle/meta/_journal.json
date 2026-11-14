@@ -330,6 +330,20 @@
       "when": 1792036934437,
       "tag": "0046_proposal_rejections",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1794634864063,
+      "tag": "0047_measurement_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1794696288072,
+      "tag": "0048_measurement_cost_receipts",
+      "breakpoints": true
     }
   ]
 }
