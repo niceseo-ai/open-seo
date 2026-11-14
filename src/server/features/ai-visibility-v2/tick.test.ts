@@ -107,9 +107,10 @@ vi.mock("@/server/lib/dataforseo/sections", () => ({
 }));
 beforeAll(async () => {
   await db.run(sql.raw("PRAGMA foreign_keys=OFF"));
-  for (const statement of readFileSync(
-    "drizzle/0047_measurement_v2.sql",
-    "utf8",
+  for (const statement of (
+    readFileSync("drizzle/0047_measurement_v2.sql", "utf8") +
+    "--> statement-breakpoint" +
+    readFileSync("drizzle/0048_measurement_cost_receipts.sql", "utf8")
   ).split("--> statement-breakpoint"))
     await db.run(sql.raw(statement));
 });
@@ -164,6 +165,7 @@ beforeEach(async () => {
   }));
   m.get.mockResolvedValue({
     status_code: 20000,
+    cost: 0,
     result: [
       {
         markdown: "Example is named.",
@@ -193,7 +195,7 @@ it("self-hosted with zero customer credits still caps 300 answers and 460.8 bill
   expect(await db.select().from(measurementAnswers)).toHaveLength(300);
   expect((await db.select().from(measurementBudgets))[0]).toMatchObject({
     answers: 300,
-    billedCreditHundredths: 46080,
+    billedCreditHundredths: 46200,
   });
   await runMeasurementV2Tick(new Date(now.getTime() + 300000));
   expect(m.get).toHaveBeenCalledTimes(20);
@@ -210,7 +212,7 @@ it("uncertain posts are never replayed and planned answers remain excluded", asy
   expect(rows).toHaveLength(300);
   expect(
     rows.every(
-      (r) => r.status === "error" && r.named === null && r.cited === null,
+      (r) => r.status === "unknown" && r.named === null && r.cited === null,
     ),
   ).toBe(true);
 });
@@ -235,6 +237,7 @@ it("repeat answers two and three use distinct upstream tasks and never read the 
   expect(new Set(repeats.map((t) => t.id)).size).toBe(3);
   m.get.mockImplementation(async () => ({
     status_code: 20000,
+    cost: 0,
     result: [
       {
         markdown:
@@ -280,6 +283,17 @@ it("retains paid task IDs when accounting halts an over-budget submission", asyn
   expect(m.post).toHaveBeenCalledTimes(1);
   await runMeasurementV2Tick(new Date(now.getTime() + 300000));
   expect(m.get).toHaveBeenCalledTimes(20);
+  expect(
+    (await db.select().from(measurementAnswers)).filter(
+      (r) => r.status === "completed",
+    ),
+  ).toHaveLength(20);
+  await runMeasurementV2Tick(new Date(now.getTime() + 600000));
+  expect(
+    (await db.select().from(measurementAnswers)).filter(
+      (r) => r.status === "completed",
+    ),
+  ).toHaveLength(40);
   expect(m.post).toHaveBeenCalledTimes(1);
 });
 it("collects paid tasks from their run snapshot after eligibility changes", async () => {
@@ -335,4 +349,23 @@ it("records malformed task_get responses as unparsed rather than a zero or timeo
       .filter((r) => r.status === "unparsed")
       .every((r) => r.named === null && r.cited === null),
   ).toBe(true);
+});
+
+it("stops collection after an unexpected charged fetch while preserving its result", async () => {
+  m.enabled = true;
+  m.dryRun = false;
+  const now = new Date();
+  await runMeasurementV2Tick(now);
+  m.get.mockResolvedValue({
+    status_code: 20000,
+    cost: 0.0012,
+    result: [{ markdown: "Example named" }],
+  });
+  await runMeasurementV2Tick(new Date(now.getTime() + 300000));
+  expect(m.get).toHaveBeenCalledTimes(1);
+  const rows = await db.select().from(measurementAnswers);
+  expect(rows.filter((r) => r.status === "completed")).toHaveLength(1);
+  expect(rows.filter((r) => r.status === "unknown").length).toBeGreaterThan(0);
+  await runMeasurementV2Tick(new Date(now.getTime() + 600000));
+  expect(m.get).toHaveBeenCalledTimes(1);
 });

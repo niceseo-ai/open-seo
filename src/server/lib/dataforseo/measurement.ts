@@ -37,6 +37,7 @@ export type MeasurementPostReceipt = {
   tasks: z.infer<typeof taskSchema>[];
   rawCredits: number;
   credits: number;
+  unknown?: boolean;
 };
 export async function postMeasurementTasks(
   input: z.infer<typeof inputSchema> & {
@@ -70,8 +71,52 @@ export async function postMeasurementTasks(
       : await measurementSerpTaskApi().googleAiModeTaskPost(
           fields.map((f) => new SerpGoogleAiModeTaskPostRequestInfo(f)),
         );
-  const parsed = envelopeSchema.parse(response);
-  const costUsd = parsed.tasks.reduce((s, t) => s + t.cost, 0);
+  const checked = envelopeSchema.safeParse(response);
+  if (!checked.success) {
+    const reported = z
+      .object({ cost: z.number().nonnegative() })
+      .safeParse(response);
+    const taskCosts = z
+      .object({ tasks: z.array(z.object({ cost: z.number().nonnegative() })) })
+      .safeParse(response);
+    const costUsd = Math.max(
+      reported.success ? reported.data.cost : 0,
+      taskCosts.success
+        ? taskCosts.data.tasks.reduce((sum, t) => sum + t.cost, 0)
+        : 0,
+    );
+    try {
+      await input.persistPosted({
+        tasks: [],
+        rawCredits: costUsd * 1000,
+        credits: applyBillingMarkupUsd(costUsd) * 1000,
+        unknown: true,
+      });
+    } catch {
+      /* Reservation remains consumed even if receipt storage is unavailable. */
+    }
+    throw new DataforseoChargedTaskError(
+      "Malformed charged receipt; reservation retained UNKNOWN; do not replay",
+      {
+        path: [
+          "v3",
+          ...(value.engine === "chatgpt"
+            ? ["ai_optimization", "chat_gpt", "llm_scraper"]
+            : ["serp", "google", "ai_mode"]),
+          "task_post",
+        ],
+        costUsd,
+      },
+    );
+  }
+  const parsed = checked.data;
+  const totalCost = z
+    .object({ cost: z.number().nonnegative() })
+    .safeParse(response);
+  const costUsd = Math.max(
+    parsed.tasks.reduce((s, t) => s + t.cost, 0),
+    totalCost.success ? totalCost.data.cost : 0,
+  );
   const data = {
     tasks: parsed.tasks,
     rawCredits: costUsd * AUTUMN_SEO_DATA_CREDITS_PER_USD,

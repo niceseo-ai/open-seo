@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { applyBillingMarkupUsd } from "@/shared/billing";
 import { runBatch } from "@/db/runBatch";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   measurementEnrollments as enrollments,
+  measurementBudgets as budgets,
   measurementRuns as runs,
   measurementAnswers as answers,
   measurementCitations as citations,
@@ -13,7 +15,7 @@ import {
   loadDataforseoSections,
 } from "@/server/lib/dataforseo/client";
 import { isTaskInProgress } from "@/server/lib/dataforseo/envelope";
-import { MEASUREMENT_V2, validateEnrollments } from "./policy";
+import { MEASUREMENT_V2, CAPS, validateEnrollments } from "./policy";
 import { measurementGate } from "./gate";
 import {
   reserveMeasurementRun,
@@ -47,7 +49,42 @@ async function collectMeasurementAnswers(now: Date) {
       const task = await (
         await loadDataforseoSections()
       ).getMeasurementTask({ engine: answer.engine, taskId: answer.taskId });
-      if (isTaskInProgress({ status_code: task.status_code })) continue;
+      await db
+        .update(answers)
+        .set({
+          getCostsUsd: JSON.stringify([
+            ...z
+              .array(z.number().nonnegative())
+              .parse(JSON.parse(answer.getCostsUsd ?? "[]") as unknown),
+            task.cost,
+          ]),
+        })
+        .where(eq(answers.id, answer.id));
+      // Persist the result before an accounting hold can throw.
+      if (isTaskInProgress({ status_code: task.status_code })) {
+        try {
+          await recordMeasurementCost(
+            run.id,
+            applyBillingMarkupUsd(task.cost) * 1000,
+          );
+        } catch {
+          console.info(
+            "[measurement-v2] accounting held; no submission replay",
+          );
+        }
+        if (task.cost > 0) {
+          await db
+            .update(budgets)
+            .set({ held: true })
+            .where(eq(budgets.week, run.week));
+          await db
+            .update(answers)
+            .set({ status: "unknown" })
+            .where(eq(answers.status, "posted"));
+          return;
+        }
+        continue;
+      }
       const parsed =
         task.status_code === 20000 && task.result?.length === 1
           ? parseMeasurement(
@@ -84,6 +121,25 @@ async function collectMeasurementAnswers(now: Date) {
           })
           .where(and(eq(answers.id, answer.id), eq(answers.status, "posted"))),
       ]);
+      try {
+        await recordMeasurementCost(
+          run.id,
+          applyBillingMarkupUsd(task.cost) * 1000,
+        );
+      } catch {
+        console.info("[measurement-v2] cost held after result saved");
+      }
+      if (task.cost > 0) {
+        await db
+          .update(budgets)
+          .set({ held: true })
+          .where(eq(budgets.week, run.week));
+        await db
+          .update(answers)
+          .set({ status: "unknown" })
+          .where(eq(answers.status, "posted"));
+        return;
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         await db
@@ -183,6 +239,7 @@ export async function runMeasurementV2Tick(now = new Date()) {
           engine: a.engine,
           repeat: a.repeat,
           status: a.status,
+          reservedCostHundredths: Math.ceil(CAPS.creditsPerAnswer * 100),
         });
       for (const engine of ["chatgpt", "ai_mode"] as Engine[]) {
         const batch = planned.filter((a) => a.engine === engine);
@@ -223,8 +280,12 @@ export async function runMeasurementV2Tick(now = new Date()) {
                             status: "posted",
                             taskId: t.id,
                             postedAt: now.toISOString(),
+                            postCostUsd: String(t.cost),
                           }
-                        : { status: "error" },
+                        : {
+                            status: "unknown",
+                            postCostUsd: t ? String(t.cost) : null,
+                          },
                     )
                     .where(eq(answers.id, a.id));
                 }),
@@ -235,7 +296,7 @@ export async function runMeasurementV2Tick(now = new Date()) {
         } catch {
           await db
             .update(answers)
-            .set({ status: "error" })
+            .set({ status: "unknown" })
             .where(
               and(eq(answers.runId, run.id), eq(answers.status, "planned")),
             );

@@ -145,3 +145,24 @@ it("refuses an overlong encoded keyword before a paid post", async () => {
   ).rejects.toThrow();
   expect(mocks.postChat).not.toHaveBeenCalled();
 });
+
+it("retains UNKNOWN accounting receipt for a malformed charged reply without replay", async () => {
+  mocks.postChat.mockResolvedValue({ status_code: 50000, cost: 0.002 });
+  const saved = vi.fn();
+  await expect(
+    postMeasurementTasks({
+      engine: "chatgpt",
+      locationCode: 2124,
+      languageCode: "en",
+      tasks: [{ id: answerId, prompt: "Synthetic?" }],
+      persistPosted: saved,
+    }),
+  ).rejects.toThrow("UNKNOWN");
+  expect(saved).toHaveBeenCalledWith({
+    tasks: [],
+    rawCredits: 2,
+    credits: 2.56,
+    unknown: true,
+  });
+  expect(mocks.postChat).toHaveBeenCalledTimes(1);
+});

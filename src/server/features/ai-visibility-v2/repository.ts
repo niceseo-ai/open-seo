@@ -34,6 +34,11 @@ export async function reserveMeasurementRun(
     billedCredits: estimate.credits,
     over2000: estimate.credits > 2000,
   });
+  // Reserve rounded per-task maximum, not a batch-price forecast.
+  estimate = {
+    ...estimate,
+    credits: (estimate.answers * Math.ceil(CAPS.creditsPerAnswer * 100)) / 100,
+  };
   const week = weekStart(now);
   const id = crypto.randomUUID();
   const inserted = await db

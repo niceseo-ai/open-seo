@@ -99,8 +99,21 @@ export const measurementAnswers = pgTable(
     engine: text("engine", { enum: ["chatgpt", "ai_mode"] }).notNull(),
     repeat: integer("repeat").notNull(),
     taskId: text("task_id"),
+    reservedCostHundredths: integer("reserved_cost_hundredths")
+      .notNull()
+      .default(0),
+    postCostUsd: text("post_cost_usd"),
+    getCostsUsd: text("get_costs_usd"),
     status: text("status", {
-      enum: ["planned", "posted", "completed", "error", "timeout", "unparsed"],
+      enum: [
+        "planned",
+        "posted",
+        "completed",
+        "error",
+        "timeout",
+        "unparsed",
+        "unknown",
+      ],
     }).notNull(),
     named: boolean("named"),
     cited: boolean("cited"),

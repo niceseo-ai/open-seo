@@ -19,6 +19,7 @@ export const CAPS = {
   creditsPerClientWeek: 108,
   answersPerWeek: 300,
   creditsPerWeek: 540,
+  // Published standard-tier maximum for the fixed one-result, priority-1 payload.
   rawCreditsPerAnswer: 1.2,
   creditsPerAnswer: 1.2 * SEO_DATA_COST_MARKUP,
 } as const;

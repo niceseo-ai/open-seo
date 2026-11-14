@@ -153,3 +153,30 @@ from the design family and is not being substituted for independent review.
 Until a separate-family review can run, this working tree stays uncommitted.
 No draft PR, hosted CI, review-thread count or five-minute post-CI wait can be
 claimed complete in that state.
+
+## Authorized repair after closed-draft PR40
+
+The preceding review history describes the initial draft. The new repair reserves
+the published standard-tier upper price for the fixed payload, rather than relying
+on the batch forecast: $0.0012 per task, shared1.28 markup, rounded UP per task to
+1.54 billed credits.300 answers reserve462 credits;460.8 remains the forecast.
+Official prices checked2026-11-14:
+https://dataforseo.com/pricing/ai-optimization/llm-scraper
+https://dataforseo.com/pricing/google-serp/google-ai-mode-serp-api
+AI Mode calculate_rectangles doubles its price; this payload does not request it.
+Priority stays1 and each task requests one result. A vendor violation cannot be
+prevented after charge; reported costs are recorded and future posts held. All
+three OFF guards, including spendBoundVerified:false, stay unchanged.
+
+Pending answer rows and their reserved cost exist before task_post. Malformed
+charged receipts mark work unknown, retain all capacity and never replay. A
+reported envelope cost is tracked even when the task shape is invalid; absence
+of cost is unknown, not evidence of zero spend. Collection records each returned
+cost and accounts it, including unexpected positive collection charges. Full
+storage failure still requires manual reconciliation. New additive receipt
+columns require later owner-approved migrations; none have been applied.
+
+Local client eligibility receipts are scratch-only. Current canonical desk
+truth/hold/never-client evidence was not available; all five remain unverified
+and unenrolled. Hosted Actions is disabled by GitHub execution error422, and
+this repair does not close/reopen the PR, trigger CI or alter Actions settings.

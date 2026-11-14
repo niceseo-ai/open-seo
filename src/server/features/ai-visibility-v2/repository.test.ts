@@ -33,9 +33,10 @@ async function reserveMeasurementRun(
 const now = new Date("2026-11-13T12:00:00Z");
 beforeAll(async () => {
   await db.run(sql.raw("PRAGMA foreign_keys=OFF"));
-  for (const statement of readFileSync(
-    "drizzle/0047_measurement_v2.sql",
-    "utf8",
+  for (const statement of (
+    readFileSync("drizzle/0047_measurement_v2.sql", "utf8") +
+    "--> statement-breakpoint" +
+    readFileSync("drizzle/0048_measurement_cost_receipts.sql", "utf8")
   ).split("--> statement-breakpoint"))
     await db.run(sql.raw(statement));
 });
@@ -53,7 +54,7 @@ describe("durable pre-post caps", () => {
     const [budget] = await db.select().from(measurementBudgets);
     expect(budget).toMatchObject({
       answers: 300,
-      billedCreditHundredths: 46080,
+      billedCreditHundredths: 46200,
     });
     const rows = await db.select().from(measurementRuns);
     expect(rows.filter((r) => r.status === "posting")).toHaveLength(5);
@@ -70,7 +71,7 @@ describe("durable pre-post caps", () => {
     expect(results.filter(Boolean)).toHaveLength(1);
     expect(
       (await db.select().from(measurementBudgets))[0].billedCreditHundredths,
-    ).toBe(9216);
+    ).toBe(9240);
   });
   it("retains unknown submission capacity and stops the week when actual spend exceeds estimate", async () => {
     const run = await reserveMeasurementRun("synthetic-one", 15, now);
@@ -102,7 +103,7 @@ describe("durable pre-post caps", () => {
 it("honours the exact hard 540 billed-credit boundary, independently of answer capacity", async () => {
   await db
     .insert(measurementBudgets)
-    .values({ week: weekStart(now), billedCreditHundredths: 47856 });
+    .values({ week: weekStart(now), billedCreditHundredths: 47840 });
   expect(
     await reserveMeasurementRun("synthetic-exact", 10, now),
   ).not.toBeNull();
@@ -121,4 +122,15 @@ it("allows only one run in the seven-day pilot even across a Monday", async () =
       new Date("2026-11-16T12:00:00Z"),
     ),
   ).toBeNull();
+});
+
+it("reserves rounded published maximum above forecast and holds vendor violations", async () => {
+  const run = await reserveMeasurementRun("synthetic-bound", 15, now);
+  expect(run!.credits).toBe(92.4);
+  await recordMeasurementCost(run!.id, 92.3);
+  await expect(assertMeasurementBudget(run!.week)).resolves.toBeUndefined();
+  await expect(recordMeasurementCost(run!.id, 1)).rejects.toThrow(
+    "exceeded reservation",
+  );
+  await expect(assertMeasurementBudget(run!.week)).rejects.toThrow("held");
 });

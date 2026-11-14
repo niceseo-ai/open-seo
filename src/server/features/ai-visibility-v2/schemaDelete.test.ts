@@ -11,9 +11,10 @@ it("does not block existing prompt deletion or project deletion", async () => {
   await client.execute(
     "CREATE TABLE ai_visibility_prompts(id TEXT PRIMARY KEY)",
   );
-  for (const statement of readFileSync(
-    "drizzle/0047_measurement_v2.sql",
-    "utf8",
+  for (const statement of (
+    readFileSync("drizzle/0047_measurement_v2.sql", "utf8") +
+    "--> statement-breakpoint" +
+    readFileSync("drizzle/0048_measurement_cost_receipts.sql", "utf8")
   ).split("--> statement-breakpoint"))
     await client.execute(statement);
   await client.execute("INSERT INTO projects VALUES('project')");
