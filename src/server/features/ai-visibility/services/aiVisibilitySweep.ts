@@ -57,7 +57,7 @@ export function decideSweep(input: {
 }
 
 /** Brand-lookup block stored on a completed run's detail JSON. */
-export type StoredBrandLookup = {
+type StoredBrandLookup = {
   fetchedAt: string;
   totalMentions: number | null;
   partialMentions: boolean;
