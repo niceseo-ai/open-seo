@@ -223,7 +223,7 @@ const toolCategories: ToolCategory[] = [
         name: "get_google_analytics_traffic_acquisition",
         title: "Get traffic acquisition",
         description:
-          "Compare channels, source/medium, or campaigns using session outcomes.",
+          "Compare channels, source/medium, campaigns, or hostnames using session outcomes.",
       },
       {
         name: "get_google_analytics_measurement_health",

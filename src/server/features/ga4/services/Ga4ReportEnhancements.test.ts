@@ -122,10 +122,43 @@ describe("GA4 report enhancements", () => {
     expect(
       supportsComparison({
         projectId: "project_1",
+        kind: "traffic_acquisition",
+        acquisitionBreakdown: "hostname",
+      }),
+    ).toBe(false);
+    expect(
+      supportsComparison({
+        projectId: "project_1",
         kind: "audience_breakdown",
         audienceBreakdown: "country",
       }),
     ).toBe(false);
+  });
+
+  it("requests hostName and skips attribution diagnostics for hostname acquisition", () => {
+    const request = buildGa4ReportRequest({
+      kind: "traffic_acquisition",
+      acquisitionBreakdown: "hostname",
+      startDate: "2026-07-09",
+      endDate: "2026-08-05",
+      channel: "all",
+      limit: 100,
+      offset: 0,
+    });
+    expect(request.dimensions).toEqual([{ name: "hostName" }]);
+    expect(request.dimensionFilter).toBeUndefined();
+    expect(
+      buildReportSpecificEnhancements(
+        report([{ hostName: "www.example.com", sessions: 12 }]),
+        {
+          projectId: "project_1",
+          kind: "traffic_acquisition",
+          acquisitionBreakdown: "hostname",
+          comparePreviousPeriod: false,
+        },
+        { startDate: "2026-07-09", endDate: "2026-08-05" },
+      ),
+    ).toEqual({ diagnostics: [] });
   });
 
   it("returns evidence-backed source attribution diagnostics", () => {
