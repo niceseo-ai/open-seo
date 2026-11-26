@@ -420,7 +420,7 @@ export const getGoogleAnalyticsOrganicOverviewTool = {
 const trafficAcquisitionInputSchema = z.strictObject({
   ...commonAnalyticsInputSchema,
   breakdown: z
-    .enum(["channel_group", "source_medium", "campaign"])
+    .enum(["channel_group", "source_medium", "campaign", "hostname"])
     .optional()
     .default("channel_group"),
   comparePreviousPeriod: z.boolean().optional().default(false),
@@ -432,7 +432,7 @@ export const getGoogleAnalyticsTrafficAcquisitionTool = {
   config: {
     title: "Get Google Analytics traffic acquisition",
     description:
-      "Compare session acquisition by channel group, source/medium, or campaign, including sessions, users, engagement, key events, transactions, and revenue. Previous-period comparison is available for channel group; source/medium also reports attribution-quality diagnostics. Read-only and uses no OpenSEO credits.",
+      "Compare session acquisition by channel group, source/medium, campaign, or hostname, including sessions, users, engagement, key events, transactions, and revenue. Hostname rows include hostName and sessions. Previous-period comparison is available for channel group; source/medium also reports attribution-quality diagnostics. Read-only and uses no OpenSEO credits.",
     inputSchema: trafficAcquisitionInputSchema,
     outputSchema: reportOutputSchema,
     annotations: {

@@ -244,6 +244,55 @@ describe("Google Analytics MCP tools", () => {
     },
   );
 
+  it("maps hostname traffic acquisition to hostName rows", async () => {
+    mocks.runReport.mockResolvedValue(
+      makeGa4ReportResult({
+        rowCount: 1,
+        totalRowCount: 1,
+        rows: [{ hostName: "www.example.com", sessions: 12 }],
+      }),
+    );
+    const { getGoogleAnalyticsTrafficAcquisitionTool } = tools;
+    expect(
+      getGoogleAnalyticsTrafficAcquisitionTool.config.inputSchema.safeParse({
+        projectId: "project_1",
+        breakdown: "hostname",
+      }).success,
+    ).toBe(true);
+    expect(
+      getGoogleAnalyticsTrafficAcquisitionTool.config.inputSchema.safeParse({
+        projectId: "project_1",
+        breakdown: "host",
+      }).success,
+    ).toBe(false);
+
+    const result = await getGoogleAnalyticsTrafficAcquisitionTool.handler(
+      {
+        projectId: "project_1",
+        breakdown: "hostname",
+        comparePreviousPeriod: false,
+        limit: 100,
+        offset: 0,
+      },
+      toolContext,
+    );
+
+    expect(mocks.runReport).toHaveBeenCalledWith({
+      projectId: "project_1",
+      breakdown: undefined,
+      comparePreviousPeriod: false,
+      limit: 100,
+      offset: 0,
+      kind: "traffic_acquisition",
+      channel: "all",
+      acquisitionBreakdown: "hostname",
+    });
+    expect(result.structuredContent).toMatchObject({
+      status: "ok",
+      rows: [{ hostName: "www.example.com", sessions: 12 }],
+    });
+  });
+
   it("returns organic overview and measurement-health envelopes", async () => {
     mocks.getOrganicOverview.mockResolvedValue({
       status: "ok",
